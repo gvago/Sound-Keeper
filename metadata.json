@@ -1,0 +1,7 @@
+{
+  "name": "Web Sound Keeper",
+  "description": "A web-based utility to prevent audio devices from sleeping by playing a configurable, continuous, and often inaudible sound stream. This provides a cross-platform alternative to desktop applications with similar functionality.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
