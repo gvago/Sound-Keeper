@@ -1,12 +1,11 @@
-
 import type { AudioConfig, Preset } from './types';
 import { StreamType } from './types';
 
 export const DEFAULT_CONFIG: AudioConfig = {
-  streamType: StreamType.Fluctuate,
-  frequency: 50, // Hz
-  amplitude: 0.1, // Percentage (0.1%)
-  isPeriodic: false,
+  streamType: StreamType.Sine,
+  frequency: 24500, // Hz
+  amplitude: 50, // Percentage
+  isPeriodic: true,
   playDuration: 0.5, // seconds
   waitDuration: 9, // minutes
   deviceId: 'default',
