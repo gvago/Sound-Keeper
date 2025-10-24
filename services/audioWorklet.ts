@@ -1,3 +1,4 @@
+
 export const getWorkletCode = (): string => `
   class SoundProcessor extends AudioWorkletProcessor {
     // For Pink Noise
@@ -12,7 +13,7 @@ export const getWorkletCode = (): string => `
     static get parameterDescriptors() {
       return [
         { name: 'type', defaultValue: 0, minValue: 0, maxValue: 5, automationRate: 'k-rate' }, // 0:Zero, 1:Fluctuate, 2:Sine, 3:White, 4:Pink, 5:Brown
-        { name: 'frequency', defaultValue: 50, minValue: 1, maxValue: 22050, automationRate: 'k-rate' },
+        { name: 'frequency', defaultValue: 50, minValue: 1, maxValue: 30000, automationRate: 'k-rate' },
         { name: 'isPeriodic', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
         { name: 'playDuration', defaultValue: 0.5, minValue: 0.1, maxValue: 10, automationRate: 'k-rate' }, // seconds
         { name: 'waitDuration', defaultValue: 9, minValue: 0, maxValue: 60, automationRate: 'k-rate' }, // minutes
@@ -27,11 +28,15 @@ export const getWorkletCode = (): string => `
       const playDuration = parameters.playDuration[0];
       const waitDuration = parameters.waitDuration[0] * 60; // minutes to seconds
 
+      const attackDurationFrames = 0.002 * sampleRate; // 2ms attack
+      const decayDurationFrames = 0.002 * sampleRate;  // 2ms decay
+
       const cycleDurationFrames = isPeriodic ? (playDuration + waitDuration) * sampleRate : 0;
       const playDurationFrames = isPeriodic ? playDuration * sampleRate : 0;
 
       for (let i = 0; i < output[0].length; i++) {
         let value = 0;
+        let envelope = 1.0;
         const currentTotalFrame = currentFrame + i;
         let shouldPlay = !isPeriodic;
 
@@ -39,6 +44,15 @@ export const getWorkletCode = (): string => `
             const frameInCycle = currentTotalFrame % cycleDurationFrames;
             if (frameInCycle < playDurationFrames) {
                 shouldPlay = true;
+                
+                // Envelope shaping for attack and decay
+                if (frameInCycle < attackDurationFrames) {
+                    // Attack phase
+                    envelope = frameInCycle / attackDurationFrames;
+                } else if (frameInCycle > playDurationFrames - decayDurationFrames) {
+                    // Decay phase
+                    envelope = (playDurationFrames - frameInCycle) / decayDurationFrames;
+                }
             }
         }
         
@@ -92,6 +106,9 @@ export const getWorkletCode = (): string => `
                 break;
             }
         }
+
+        // Apply envelope and clamp value
+        value *= Math.max(0, envelope);
 
         for (let j = 0; j < output.length; j++) {
             output[j][i] = value;

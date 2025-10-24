@@ -146,7 +146,7 @@ const Controls: React.FC<ControlsProps> = ({ config, onConfigChange, onStreamTyp
             label="Frequency"
             unit="Hz"
             min={1}
-            max={config.streamType === 'Sine' ? 20000 : 200}
+            max={config.streamType === 'Sine' ? 30000 : 200}
             step={1}
             value={config.frequency}
             onChange={(val) => onConfigChange({ frequency: val })}

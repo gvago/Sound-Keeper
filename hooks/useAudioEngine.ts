@@ -1,3 +1,4 @@
+
 import { useState, useRef, useCallback } from 'react';
 import type { AudioConfig } from '../types';
 import { StreamType } from '../types';
@@ -16,16 +17,14 @@ export const useAudioEngine = () => {
 
   const createNodes = async (deviceId: string): Promise<AudioNodes> => {
     if (audioNodesRef.current) {
-        await audioNodesRef.current.context.close();
+        // Attempt to close previous context if it exists and is not already closed
+        if (audioNodesRef.current.context.state !== 'closed') {
+            await audioNodesRef.current.context.close();
+        }
     }
     
-    // FIX: Property 'sinkId' does not exist on type 'AudioContextOptions'.
-    // Widen the type to include `sinkId` and remove the incorrect feature detection.
     const contextOptions: AudioContextOptions & { sinkId?: string } = {};
     if (deviceId && deviceId !== 'default') {
-        // The previous feature detection for 'sinkId' was incorrect and has been removed.
-        // We now rely on the robust error handling in the start() function, which will
-        // alert the user if the selected audio device is not supported.
         contextOptions.sinkId = deviceId;
     }
     
@@ -46,7 +45,9 @@ export const useAudioEngine = () => {
     const { streamType, frequency, amplitude, isPeriodic, playDuration, waitDuration } = config;
     const now = context.currentTime;
 
-    gain.gain.setValueAtTime(amplitude / 100, now);
+    // Smoothly update gain to prevent clicks from amplitude changes
+    gain.gain.cancelScheduledValues(now);
+    gain.gain.linearRampToValueAtTime(amplitude / 100, now + 0.02); // 20ms ramp
 
     const typeParam = source.parameters.get('type');
     const freqParam = source.parameters.get('frequency');
@@ -75,6 +76,9 @@ export const useAudioEngine = () => {
       const newNodes = await createNodes(config.deviceId);
       audioNodesRef.current = newNodes;
       configRef.current = config;
+      
+      // Set initial gain to 0 to prepare for a smooth fade-in
+      newNodes.gain.gain.setValueAtTime(0, newNodes.context.currentTime);
 
       applyConfig(newNodes, config);
       
@@ -92,18 +96,36 @@ export const useAudioEngine = () => {
     }
   }, [isActive]);
 
-  const stop = useCallback(async () => {
-    if (!isActive || !audioNodesRef.current) return;
+  const stop = useCallback(() => {
+    if (!isActive || !audioNodesRef.current) {
+        return Promise.resolve();
+    }
     
-    const { context, source } = audioNodesRef.current;
-    
-    source.disconnect();
-    
-    await context.close();
-    
-    audioNodesRef.current = null;
+    const nodesToStop = audioNodesRef.current;
+    audioNodesRef.current = null; // Prevent race conditions with quick stop/start
     configRef.current = null;
-    setIsActive(false);
+    setIsActive(false); // Update UI state immediately
+    
+    return new Promise<void>((resolve) => {
+        const { context, source, gain } = nodesToStop;
+        const now = context.currentTime;
+        
+        // Fade out to prevent clicks
+        gain.gain.cancelScheduledValues(now);
+        gain.gain.linearRampToValueAtTime(0, now + 0.02); // 20ms fade-out
+
+        setTimeout(async () => {
+            try {
+                if (context.state !== 'closed') {
+                    source.disconnect();
+                    await context.close();
+                }
+            } catch (e) {
+                console.warn("Error during audio context cleanup:", e);
+            }
+            resolve();
+        }, 50); // Give ramp time to finish
+    });
   }, [isActive]);
   
   const update = useCallback((newConfig: AudioConfig) => {

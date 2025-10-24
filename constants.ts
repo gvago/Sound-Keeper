@@ -22,6 +22,17 @@ export const PRESETS: Preset[] = [
       isPeriodic: false,
     },
   },
+  {
+    label: 'Periodic Pulse (24.5kHz, 50%)',
+    config: {
+      streamType: StreamType.Sine,
+      isPeriodic: true,
+      playDuration: 0.5,
+      waitDuration: 9,
+      frequency: 24500,
+      amplitude: 50,
+    },
+  },
 ];
 
 export const STREAM_TYPE_OPTIONS = [
